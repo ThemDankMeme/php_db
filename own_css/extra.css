@@ -1,0 +1,20 @@
+input[type=text], input[type=email], input[type=number], input[type=date]{
+    width:95%;
+    border: none;
+    display: inline-block;
+    background: #404040;
+    padding: 1.4%;
+    margin-bottom: 2%;
+    border-radius: 5px;
+    margin-left: 2%;
+    margin-top: 0.5%;
+}
+input[type=text]:focus, input[type=email]:focus, input[type=number]:focus{
+    background-color: #A6A6A6;
+    outline: none;
+}
+#modal-body {
+    height: fit-content;
+    width: 90%;
+    border-radius: 25px;
+}

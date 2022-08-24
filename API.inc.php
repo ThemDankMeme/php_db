@@ -32,20 +32,26 @@ class API{
         $json['data']=['message'=>$data];
         return json_encode($json);
     }
-    public function createSale($email, $order, $amount, $total): string{
+    public function createSale($email, $order, $date, $amount, $total): string{
         $orgEmail = $email;
         $orgOrder = $order;
         $orgAmount = $amount;
         $orgTotal = $total;
+        $orgDate = $date;
         $email = $this->testInput($email);
         $order = $this->testInput($order);
         $amount = $this->testInput($amount);
         $total = $this->testInput($total);
-        if($this->beforeSubmit($orgEmail, $email) && $this->beforeSubmit($orgOrder, $order) && $this->beforeSubmit($orgAmount, $amount) && $this->beforeSubmit($orgTotal, $total)){
+        $date = $this->testInput($date);
+        if($this->beforeSubmit($orgEmail, $email) && $this->beforeSubmit($orgOrder, $order) && $this->beforeSubmit($orgAmount, $amount) && $this->beforeSubmit($orgTotal, $total) && $this->beforeSubmit($orgDate, $date)){
             if($this->validEmail($email)){
                 $user = $this->findEmail($email);
+                $valid = $this->findOrder($user, $order, $date);
                 if($user==-1)
                     return $this->setGeneric('failed', 401, "Check Email: ".$email );
+                elseif ($valid){
+                    return $this->setGeneric('failed', 500, "exists or server error");
+                }
                 else{
                     try {
                         $date = date_create()->format('Y-m-d');
@@ -72,6 +78,26 @@ class API{
             return $this->teaPot();
 
     }
+    private function findOrder($user, $order, $date): bool{
+        try {
+            $sql = "SELECT order_no
+                    from sales
+                    WHERE order_no=:order and client=:user and order_date=:date";
+            $query = $this->conn->prepare($sql);
+            $query->bindParam(':order', $order, PDO::PARAM_INT);
+            $query->bindParam(':user', $user, PDO::PARAM_INT);
+            $query->bindParam(':date', $date, PDO::PARAM_STR);
+            $query->execute();
+            if($query->rowCount()!=0){
+                return true;
+            }
+            else return false;
+        }
+        catch (PDOException $err){
+            return true;
+        }
+    }
+
     private function validEmail($email): bool{
         $original = $email;
         $email = $this->testInput($email);
@@ -123,9 +149,11 @@ class API{
     public function readRange($start, $end, $page):string{
         $originalStart = $start;
         $originalEnd = $end;
+        $orgPage = $page;
+        $page = $this->testInput($page);
         $start = $this->testInput($start);
         $end = $this->testInput($end);
-        if($this->beforeSubmit($originalStart, $start)&&$this->beforeSubmit($originalEnd, $end)){
+        if($this->beforeSubmit($originalStart, $start)&&$this->beforeSubmit($originalEnd, $end) && $this->beforeSubmit($orgPage, $page)){
             try {
                 $sql = "SELECT COUNT(*) FROM sales WHERE order_date BETWEEN ? AND ?";
                 $query = $this->conn->prepare($sql);
@@ -136,6 +164,9 @@ class API{
                 }else{
                     $limit = 10;
                     $pages = ceil($total/$limit);
+                    if($page>$pages || $page<=0){
+                        return $this->teaPot();
+                    }
                     $offset = ($page-1)*$limit;
                     $sql = "SELECT order_no, users.name, order_date, amount_ex_vat, total, revised
                             FROM sales 
@@ -152,6 +183,7 @@ class API{
                     $count = $query->rowCount();
                     $json['status'] = 'success';
                     $json['code'] = 200;
+                    $json['page'] = (int)$page;
                     $json['count'] = $count;
                     $json['pages'] = $pages;
                     $json['start'] = $offset+1;
@@ -291,7 +323,6 @@ class API{
         $value = stripcslashes($value);
         return htmlspecialchars($value);
     }
-
     private function beforeSubmit($original, $temp): bool
     {
         if ($original != $temp)
@@ -306,7 +337,7 @@ if($_SERVER['REQUEST_METHOD']=='POST') {
     if (isset($_POST['type'])) {
         $instance = new API();
         if($_POST['type']=='create'){
-            $res = $instance->createSale($_POST['email'], $_POST['order'], $_POST['amount'], $_POST['total']);
+            $res = $instance->createSale($_POST['email'], $_POST['order'], $_POST['date'], $_POST['amount'], $_POST['total']);
         }
         elseif ($_POST['type']=='read'){
             $res = $instance->readRange($_POST['start'], $_POST['end'], $_POST['page']);
@@ -329,6 +360,3 @@ if($_SERVER['REQUEST_METHOD']=='POST') {
         echo($res);
     }
 }
-//$instance = new API();
-//$instance->test();
-//echo ($instance->readRange('1995-01-01', '2018-12-31', 5));
