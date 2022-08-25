@@ -11,25 +11,15 @@ class API{
     public function __construct(){
         $this->conn = Database::connection();
     }
-    function test(){
-        try {
-            $sql = "SELECT id, item_code, item_name, price FROM products";
-            $query = $this->conn->prepare($sql);
-            $query->execute();
-            while ($row = $query->fetch(PDO::FETCH_ASSOC)){
-                echo $row['id']." ".$row['item_code']." ".$row['item_name']." ".$row['price'].PHP_EOL;
-
-            }
-        }
-        catch (PDOException $err){
-            echo $err->getMessage();
-        }
+    public function __destruct(){
+        $this->conn = null;
     }
     public function setGeneric($status, $code, $data):string{
         $json['status']=$status;
         $json['code']= $code;
         $json['timestamp']=time();
         $json['data']=['message'=>$data];
+        header($status,false,  $code);
         return json_encode($json);
     }
     public function createSale($email, $order, $date, $amount, $total): string{
@@ -97,7 +87,6 @@ class API{
             return true;
         }
     }
-
     private function validEmail($email): bool{
         $original = $email;
         $email = $this->testInput($email);
@@ -213,9 +202,11 @@ class API{
     }
     private function errorMessage(PDOException $err):string{
         error_log("Unexpected Error: " . $err->getMessage() . " at " . date_create()->format('Y-m-d H:i:s'));
+        header($err->getMessage(), true, $err->getCode());
         return $this->setGeneric('error', 500, $err->getMessage());
     }
     private function teaPot():string{
+        header("The server refuses the attempt to brew coffee with a teapot.",true,  418);
         return $this->setGeneric('error', 418, "The server refuses the attempt to brew coffee with a teapot.");
     }
     public function updateSale($order, $date, $amount, $total){
@@ -329,6 +320,38 @@ class API{
             return false;
         else return true;
     }
+    public function exportCSV($start, $end){
+        $originalStart = $start;
+        $originalEnd = $end;
+        $start = $this->testInput($start);
+        $end = $this->testInput($end);
+        if($this->beforeSubmit($originalStart, $start) && $this->beforeSubmit($originalEnd, $end)){
+//            header('Content-Type: text/csv; charset=utf-8');
+//            header('Content-Disposition: attachment; filename='.$start.'-'.$end.'.csv');
+//            $output = fopen('test.csv', "w");
+//            fputcsv($output, array("ID","Order", "Client", "Order Date", "Amount Excl. VAT", "Total", "Revised"));
+            try {
+                $output['status']='success';
+                $sql = "SELECT * 
+                        from sales 
+                        WHERE order_date BETWEEN ? AND ?
+                        ORDER BY order_date DESC";
+                $query = $this->conn->prepare($sql);
+                $query->execute([$start, $end]);
+                while($row = $query->fetch(PDO::FETCH_ASSOC))
+                {
+                    $output[]=$row;
+                }
+                return json_encode($output);
+
+            }catch (PDOException $err){
+                return $this->errorMessage($err);
+            }
+
+        }
+        else
+            return $this->teaPot();
+    }
 
 
 }
@@ -353,6 +376,9 @@ if($_SERVER['REQUEST_METHOD']=='POST') {
         }
         elseif($_POST['type']=='info'){
             $res = $instance->orderInfo($_POST['order']);
+        }
+        elseif($_POST['type']=='download'){
+            $res = $instance->exportCSV($_POST['start'], $_POST['end']);
         }
         else{
             $res = $instance->setGeneric('failed', 501, 'NO METHOD MATCHING FOUND');

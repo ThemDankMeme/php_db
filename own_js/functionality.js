@@ -1,14 +1,10 @@
 let timer;
-setTimeout(function (){
-       document.getElementById('myModal').ariaModal;
-}, 2000);
 function displayLoad(elem, type){
        document.getElementById('modal-body').innerHTML='';
        document.getElementById('modal-body').innerHTML=spinner();
        document.getElementById('modalTitle').innerHTML="Loading...";
        document.getElementById('confirm').innerHTML=spinner();
        clearTimeout(timer);
-       console.log(type);
        timer = setTimeout(function (){
               if (type==='update'){
                      update(elem);
@@ -18,7 +14,36 @@ function displayLoad(elem, type){
                      addSale();
               }
        }, 1000);
-
+}
+function oneDoesNot(){
+       document.getElementById('modal-body').innerHTML='';
+       document.getElementById('modal-body').innerHTML=spinner();
+       document.getElementById('modalTitle').innerHTML="Mmmm what might this be?";
+       document.getElementById('confirm').innerHTML=spinner();
+       clearTimeout(timer);
+       timer = setTimeout(function (){
+              simply();
+       }, 2000);
+}
+function refreshContent(){
+       let url = "http://localhost/phpWeb/table.inc.php";
+       let xhr = new XMLHttpRequest();
+       xhr.open("GET", url, true);
+       xhr.onreadystatechange = function() {
+              if (this.readyState === 4 && this.status === 200) {
+                     document.getElementById('table-container').innerHTML = xhr.response;
+                     callPost('read');
+              }
+       };
+       xhr.send();
+}
+function tableLoad(json){
+       document.getElementById('table-body').innerHTML='';
+       document.getElementById('table-body').innerHTML = spinner();
+       clearTimeout(timer);
+       timer = setTimeout(function (){
+              createReadTable(json);
+       }, 1000);
 }
 function spinner(){
        return "<div class='spinner-border text-secondary' role='status' id='loading'>" +
@@ -33,17 +58,23 @@ function validateEmail(){
        }
        else{
               document.getElementById("user-email").style.background = "#F2275D";
-              alert("Email input incorrect");
        }
 }
 function validateValues(value){
        let temp = document.getElementById(value);
        if(temp.value===""){
               temp.style.background="#F2275D";
-              alert("Missing Field: "+value);
        }
        else{
               temp.style.background="";
+       }
+}
+function clicked(elem){
+       if(elem==='prev'){
+              document.getElementById('prev-page').value = true;
+       }
+       else if(elem==='next'){
+              document.getElementById('next-page').value = true;
        }
 }
 function callPost(type){
@@ -52,23 +83,19 @@ function callPost(type){
        xhr.open("POST", url,true);
        xhr.setRequestHeader("Content-Type", "application/json");
        xhr.onreadystatechange = function () {
-              if (xhr.readyState === 4 && xhr.status===200) {
+              if (xhr.readyState === 4 && xhr.status === 200) {
                      let json = JSON.parse(xhr.responseText);
-                     if(json.status==="success"){
-                            if(type==='read') {
-                                   createReadTable(json);
-                            }else if(type==='update'){
-                                   alert(json.data.message);
+                     if (json.status === "success") {
+                            if (type === 'read') {
+                                   tableLoad(json);
+                            } else if (type === 'update') {
                                    callPost('read');
-                            }else if(type==='delete'){
-                                   alert(json.data.message);
-                                   callPost('read');
-                            }else if(type==='create'){
-                                   alert(json.data.message)
-                                   callPost('read');
+                            } else if (type === 'delete') {
+                                   refreshContent()
+                            } else if (type === 'create') {
+                                   refreshContent();
                             }
-                     }
-                     else if(json.status==="failed"){
+                     } else if (json.status === "failed") {
                             alert(json.data.message);
                      }
               }
@@ -76,38 +103,54 @@ function callPost(type){
        let data = setType(type);
        xhr.send(JSON.stringify(data));
 }
+function endDate(){
+       let end = document.getElementById('end');
+       if (end !== null && end.value === "") {
+              end = new Date();
+              let dd = end.getDate();
+              if (dd < 10)
+                     dd = '0' + dd;
+              let mm = end.getMonth() + 1;
+              if (mm < 10)
+                     mm = '0' + mm;
+              let yy = end.getFullYear();
+              end = yy + '-' + mm + '-' + dd;
+       } else {
+              end = end.value;
+       }
+       return end;
+}
 function setType(type){
        let data;
-       if(type==='read') {
+       if(type==='read' || type==='download') {
               let start = document.getElementById('start').value;
-              let end = document.getElementById('end');
+              let end = endDate();
               let page = parseFloat(document.getElementById('current-page').innerHTML);
-              if (end !== null && end.value === "") {
-                     end = new Date();
-                     let dd = end.getDate();
-                     if (dd < 10)
-                            dd = '0' + dd;
-                     let mm = end.getMonth() + 1;
-                     if (mm < 10)
-                            mm = '0' + mm;
-                     let yy = end.getFullYear();
-                     end = yy + '-' + mm + '-' + dd;
-              } else {
-                     end = end.value;
-              }
-              if(page===0){
-                     page = 1;
-              }else if(page>=1){
-                     if(document.getElementById('next-page').value==='true'){
-                            document.getElementById('next-page').value = false;
-                            page += parseFloat(1);
+              if(type==='read') {
+                     if (page === 0) {
+                            page = 1;
+                     } else if (page >= 1) {
+                            if (document.getElementById('next-page').value === 'true') {
+                                   document.getElementById('next-page').value = false;
+                                   page += parseFloat(1);
+                            } else if (document.getElementById('prev-page').value === 'true' && page !== 1) {
+                                   document.getElementById('prev-page').value = false;
+                                   page -= parseFloat(1);
+                            }
                      }
-                     else if(document.getElementById('prev-page').value ==='true' && page!==1){
-                            document.getElementById('prev-page').value = false;
-                            page -= parseFloat(1);
-                     }
+                     data = {
+                            "type": "read",
+                            "start": start,
+                            "end": end,
+                            "page": page
+                     };
+              }else if(type==='download'){
+                     data={
+                            "type": "download",
+                            "start": start,
+                            "end": end
+                     };
               }
-              data = {"type": "read", "start": start, "end": end, "page": page};
        }
        else if(type==='update'){
               let order = document.getElementById('confirm').value;
@@ -119,7 +162,8 @@ function setType(type){
                      "order": order,
                      "amount": amount,
                      "total": total,
-                     "date": date};
+                     "date": date
+              };
        }
        else if(type==='delete'){
               let order = document.getElementById('confirm').value;
@@ -156,27 +200,40 @@ function createReadTable(json){
               document.getElementById('table-body').appendChild(row);
        }
        document.getElementById('current-page').innerHTML = json.page;
-       console.log(JSON.stringify(json));
-       if(json.page<json.pages && json.page>1){
-              document.getElementById('next-page').innerHTML="<i class='bi bi-arrow-right'></i>";
-              document.getElementById('prev-page').innerHTML="<i class='bi bi-arrow-left'></i>";
-              document.getElementById('next-page').disabled= false;
-              document.getElementById('prev-page').disabled= false;
-       }
-       else if(json.page===1){
-              console.log(json.page);
+       if(json.page===1 && json.page<json.pages){
               document.getElementById('next-page').innerHTML="<i class='bi bi-arrow-right'></i>";
               document.getElementById('next-page').disabled = false;
               document.getElementById('prev-page').innerHTML="<i class='bi bi-dash'></i>";
               document.getElementById('prev-page').disabled= true;
        }
-       else if(json.page===json.pages){
+       else if(json.page===json.pages && json.page!==1){
               document.getElementById('prev-page').innerHTML="<i class='bi bi-arrow-left'></i>";
               document.getElementById('prev-page').disabled= false;
               document.getElementById('next-page').innerHTML="<i class='bi bi-dash'></i>";
               document.getElementById('next-page').disabled = true;
        }
+       else if(json.page<json.pages && json.page>1){
+              document.getElementById('next-page').innerHTML="<i class='bi bi-arrow-right'></i>";
+              document.getElementById('prev-page').innerHTML="<i class='bi bi-arrow-left'></i>";
+              document.getElementById('next-page').disabled= false;
+              document.getElementById('prev-page').disabled= false;
+       }
 
+}
+function simply(){
+       let url = "http://localhost/phpWeb/nopeNothingHere.inc.php";
+       let xhr = new XMLHttpRequest();
+       xhr.open("POST", url, true);
+       xhr.setRequestHeader("Content-Type", "application/json");
+       xhr.onreadystatechange = function () {
+              if (xhr.readyState === 4 && xhr.status===200) {
+                     let json = JSON.parse(xhr.responseText);
+                     if(json.url!==""){
+                            walkInto(json);
+                     }
+              }
+       };
+       xhr.send();
 }
 function createReadRow(json, i, row){
        row+= "<td id='order'>"+json.data[i].order+"</td>";
@@ -396,8 +453,8 @@ function labelGenerator(type, desc){
        }
 
        return input;
-}*/
-/*
+}
+
 function addSaleModalBody(row){
        row += "<td><input id='user-email'  name='user-email' type='email' onblur='validateEmail()' required></td>";
        row += "<td><input id='user-order'  name='user-order' type='number' minlength='3' maxlength='20' onblur='validateValues('user-order')' required></td>";
@@ -413,8 +470,8 @@ function addSaleModalHead(row){
        row+= "<th scope='col'>Amount excl. VAT</th>";
        row+= "<th scope='col'>Total</th>";
        return row;
-}*/
-/*
+}
+
 function checkUser(email){
        let url = "http://localhost/phpWeb/API.php";
        let valid;
@@ -441,11 +498,80 @@ function checkUser(email){
        xhr.send(JSON.stringify(data));
        return valid;
 }*/
-function clicked(elem){
-       if(elem==='prev'){
-              document.getElementById('prev-page').value = true;
-       }
-       else if(elem==='next'){
-              document.getElementById('next-page').value = true;
-       }
+function downloadCSV(type){
+       // const {Parser} = require('json2csv');
+       // const fields = ['ID', 'Order#', 'Client', 'Date', 'Amount_Excl_VAT', 'Total', 'Revised'];
+       // const json2csvParser = new Parser({fields});
+       // const csv = json2csvParser.parse(json);
+       // console.log(JSON.stringify(json));
+       // console.log(csv);
+       //let array = typeof json != 'object' ? JSON.parse(json) : json;
+       //console.log(array);
+       // for (let i = 0; i < array.length; i++) {
+       //        let line = '';
+       //        for (let index in array[i]) {
+       //               if (line !== '') line += ','
+       //
+       //               line += array[i][index];
+       //        }
+       //
+       //        str += line + '\r\n';
+       // }
+       // const replacer = (key, value) => (value === null ? "" : value);
+       // const header = Object.keys(json[0]);
+       // const csv = [
+       //        header.join(","),
+       //        ...json.map((row) =>
+       //            header
+       //                .map((fieldName) => JSON.stringify(row[fieldName], replacer))
+       //                .join(",")
+       //        ),
+       // ].join("\r\n");
+       // console.log(csv);
+       // let hidden = document.createElement('a');
+       // console.log(str);
+       // hidden.href='data:text/csv;charset=utf-8,' + encodeURI(str);
+       // hidden.target='_blank';
+       // hidden.download = 'testing.csv';
+       // hidden.click();
+       let url = "http://localhost/phpWeb/toCSV.inc.php";
+       let xhr = new XMLHttpRequest();
+       xhr.open("POST", url, true);
+       xhr.setRequestHeader("Content-Type", "application/excel");
+       xhr.onreadystatechange = function() {
+              let data = xhr.responseText;
+              if (this.readyState === 4 && this.status === 200) {
+                     if(data!==""){
+                     let hidden = document.createElement('a');
+                     hidden.href = 'data:text/csv;charset=utf-8,'+ encodeURI(data);
+                     hidden.target = '_blank';
+                     let start = document.getElementById('start').value;
+                     let end = endDate();
+                     hidden.download = start +"_-_"+ end + '.csv';
+                     hidden.click();
+                     }
+                     else{
+                            alert("ERROR RETRIEVING CSV");
+                     }
+              }
+       };
+       let data = setType(type);
+       xhr.send(JSON.stringify(data));
+}
+function mordor(){
+       simply();
+}
+function walkInto(json){
+       document.getElementById('modalTitle').innerHTML = "RED PILL OR BLUE PILL";
+       document.getElementById('confirm').innerHTML = "MEMES";
+       document.getElementById('confirm').setAttribute("onclick", "mordor()");
+       document.getElementById('modal-body').innerHTML = '';
+       let memeBody = document.createElement('div');
+       memeBody.setAttribute('class', 'container container-fluid text-center');
+       memeBody.setAttribute('style', 'width: 80%;');
+       let img = document.createElement('img');
+       img.setAttribute('class', 'img-fluid');
+       img.setAttribute('src', json.url);
+       memeBody.appendChild(img);
+       document.getElementById('modal-body').appendChild(memeBody);
 }

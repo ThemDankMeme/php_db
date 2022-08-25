@@ -1,0 +1,7 @@
+{
+  "name": "php_db",
+  "version": "1.0.0",
+  "dependencies": {
+    "json2csv": "^5.0.7"
+  }
+}
