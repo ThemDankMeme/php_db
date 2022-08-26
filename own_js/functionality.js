@@ -559,7 +559,7 @@ function downloadCSV(type){
        xhr.send(JSON.stringify(data));
 }
 function mordor(){
-       simply();
+
 }
 function walkInto(json){
        document.getElementById('modalTitle').innerHTML = "RED PILL OR BLUE PILL";
